@@ -15,73 +15,60 @@ def search_pdf(pdf_file):
     # Extract text from PDF for parsing
     page_text = page.extract_text()
     # Remove unwanted text not dismissed by regex in the following section
-    page_text_new = page_text.replace("V PAY", "")
-    page_text_new_2 = page_text_new.replace("SPAARZEGELS",  "")
-    page_text_new_3 = page_text_new_2.replace("PREMIUM", "")
-    # Split lines for easier parsing
-    lines = page_text_new_3.split('\n')
+    ignored_text_lines = ["V PAY", "SPAARZEGELS", "PREMIUM", "SUBTOTAAL", "KOOPZEGELS"]
+    for text in ignored_text_lines:
+        page_text = page_text.replace(text, "")
+    # Split into lines
+    lines = page_text.split('\n')
+
 
     # Search lines
+    products = []
     for line in lines:
         # Search for products bought, excluding non-relevant information
-        groceries_search = re.search(
-        r"^B[0-9]|BB[0-9]|^[0-9]\s|^[0-9]\.\d{2,3}", line)
+        regex = r"^(B?B?[0-9]+.?[0-9]*?K?G?) ([A-Z\.\,\']+[A-Z\.\,\' ]+) ([0-9 ]+\,[0-9]+)"
+        groceries_search = re.search(regex, line)
         # Store found groceries in variable and print
         if groceries_search:
-            groceries = line
-
-            # Split line to only get the quantity of bought products
-            # in int or float
-            groceries_quantity = groceries.split()[0]
+            # Split the match into amount, product and price
+            matches = re.match(regex, line)
+            amount = matches.group(1)
+            product = matches.group(2)
+            price = matches.group(3)
             # Remove the 'B' or 'BB' at the start of the 'quantity' string
-            groceries_quantity_new = groceries_quantity.replace("B","")
-            print(groceries_quantity_new)
+            amount = re.search(r"[0-9,.]+([A-Z]{2})?", amount)[0]
+            # Remove prices per piece from product if applicable
+            product = re.search(r"[a-zA-Z_\'\,\.]+( [a-zA-Z_\'\,\.]+)*", product)[0]
+            # Remove the empty space from price
+            price = price.replace(" ","")
+            print(f"{amount} x {product} {price}")
+            products.append({"amount": amount,"product":product,"total": price})
+    return products
 
-            # First part of product line
-            groceries_products = groceries.split()[1:2]
-            for value in groceries_products:
-                items = re.search("([A-Z]+)", value)
-                if items:
-                    first_part = items.group()
-                    print(first_part)
-
-            # Second part of products line
-            groceries_products = groceries.split()[2:3]
-            for value in groceries_products:
-                items = re.search("([A-Z]+)", value)
-                if items:
-                    second_part = items.group()
-                    print(second_part)
-
-            # Third part of products line
-            groceries_products = groceries.split()[3:4]
-            for value in groceries_products:
-                items = re.search("([A-Z]+)", value)
-                if items:
-                    third_part = items.group()
-                    print(third_part)
-
-            # Print first part of price
-            groceries_prices = groceries.split()
-            for value in groceries_prices:
-                items = re.match(r"[0-9]+,[0-9]+", value)
-                if items:
-                    price_one = items.group()
-                    print(price_one)
-
-
-def data_to_csv(groceries_quantity_new):
+def data_to_csv(new_groceries):
     # Open and read csv file with write function
-    df = pd.read_csv('assets/groceries.csv')
-
+    csv_file = 'assets/groceries.csv'
+    df = pd.read_csv(csv_file, sep=';')
     # Print output groceries_quantity_new to first column
+    for grocery in new_groceries:
+        amount = re.search(r"^[0-9\,\.]+", grocery['amount'])[0]
+        total = float(grocery['total'].replace(',','.'))
+        price = round(total / float(amount), 2)
+        new_entry = pd.DataFrame([{
+            'Amount/quantity': grocery['amount'],
+            'Product': grocery['product'],
+            'Price': price,
+            'Total': total
+        }])
+        df = pd.concat([df, new_entry], ignore_index=True, axis=0)
 
-    pass
+    df.to_csv(csv_file, index=False, sep=';')
+
 
 
 # Initializer
 if __name__ == "__main__":
     pdf_file = "assets/AH_kassabon_2.pdf"
-    # search_pdf(pdf_file)
+    #search_pdf(pdf_file)
     data_to_csv(search_pdf(pdf_file))
 
