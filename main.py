@@ -6,8 +6,6 @@ import re
 # pandas for csv
 import pandas as pd
 
-# Define (or include in existing program) function that reads each file in a
-# folder and executes the main program
 
 # Main program
 def search_pdf(pdf_file):
